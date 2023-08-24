@@ -10,6 +10,8 @@
 import os
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
@@ -190,10 +192,10 @@ def training_loop(
 
     Gs_update_op = Gs.setup_as_moving_average_of(G, beta=Gs_beta)
     with tf.device('/gpu:0'):
-        try:
-            peak_gpu_mem_op = tf.contrib.memory_stats.MaxBytesInUse()
-        except tf.errors.NotFoundError:
-            peak_gpu_mem_op = tf.constant(0)
+        # try:
+        #     peak_gpu_mem_op = tf.contrib.memory_stats.MaxBytesInUse()
+        # except tf.errors.NotFoundError:
+        peak_gpu_mem_op = tf.constant(0)
 
     print('Setting up snapshot image grid...')
     grid_size, grid_reals, grid_labels, grid_latents = misc.setup_snapshot_image_grid(G, training_set, **grid_args)

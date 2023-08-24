@@ -212,8 +212,8 @@ def setup_snapshot_image_grid(G, training_set,
     layout  = 'row_per_class'):    # 'random' = grid contents are selected randomly, 'row_per_class' = each row corresponds to one class label.
     #Set layout to random if random generation, or anything else for row = condition
 
-    layout = 'row_per_class'
-    #layout = 'random'
+    #layout = 'row_per_class'
+    layout = 'random'
     # Select size.
     gw = 30; gh = 10
 

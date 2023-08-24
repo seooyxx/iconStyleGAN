@@ -9,6 +9,9 @@
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 
 from collections import OrderedDict
 from typing import List, Union
@@ -39,7 +42,7 @@ class Optimizer:
 
     def __init__(self,
                  name: str = "Train",
-                 tf_optimizer: str = "tf.train.AdamOptimizer",
+                 tf_optimizer: str = "tf.compat.v1.train.AdamOptimizer",
                  learning_rate: TfExpressionEx = 0.001,
                  use_loss_scaling: bool = False,
                  loss_scaling_init: float = 64.0,
@@ -149,7 +152,7 @@ class Optimizer:
 
                     # Check for overflows.
                     with tf.name_scope("CheckOverflow"):
-                        grad_ok = tf.reduce_all(tf.stack([tf.reduce_all(tf.is_finite(g)) for g, v in grads]))
+                        grad_ok = tf.reduce_all(tf.stack([tf.reduce_all(tf.math.is_finite(g)) for g, v in grads]))
 
                     # Update weights and adjust loss scaling.
                     with tf.name_scope("UpdateWeights"):

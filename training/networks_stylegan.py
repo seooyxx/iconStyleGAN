@@ -9,6 +9,7 @@
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import dnnlib
 import dnnlib.tflib as tflib
 
@@ -20,7 +21,7 @@ import dnnlib.tflib as tflib
 # The gradients of these are not necessary efficient or even meaningful.
 
 def _blur2d(x, f=[1,2,1], normalize=True, flip=False, stride=1):
-    assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
+    assert x.shape.ndims == 4 and all(dim is not None for dim in x.shape[1:])
     assert isinstance(stride, int) and stride >= 1
 
     # Finalize filter kernel.
@@ -49,7 +50,7 @@ def _blur2d(x, f=[1,2,1], normalize=True, flip=False, stride=1):
     return x
 
 def _upscale2d(x, factor=2, gain=1):
-    assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
+    assert x.shape.ndims == 4 and all(dim is not None for dim in x.shape[1:])
     assert isinstance(factor, int) and factor >= 1
 
     # Apply gain.
@@ -68,7 +69,7 @@ def _upscale2d(x, factor=2, gain=1):
     return x
 
 def _downscale2d(x, factor=2, gain=1):
-    assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
+    assert x.shape.ndims == 4 and all(dim is not None for dim in x.shape[1:])
     assert isinstance(factor, int) and factor >= 1
 
     # 2x2, float32 => downscale using _blur2d().
@@ -133,7 +134,7 @@ def downscale2d(x, factor=2):
 # Get/create weight tensor for a convolutional or fully-connected layer.
 
 def get_weight(shape, gain=np.sqrt(2), use_wscale=False, lrmul=1):
-    fan_in = np.prod(shape[:-1]) # [kernel, kernel, fmaps_in, fmaps_out] or [in, out]
+    fan_in = int(np.prod(shape[:-1])) # [kernel, kernel, fmaps_in, fmaps_out] or [in, out]
     he_std = gain / np.sqrt(fan_in) # He init
 
     # Equalized learning rate and custom learning rate multiplier.
@@ -153,8 +154,8 @@ def get_weight(shape, gain=np.sqrt(2), use_wscale=False, lrmul=1):
 
 def dense(x, fmaps, **kwargs):
     if len(x.shape) > 2:
-        x = tf.reshape(x, [-1, np.prod([d.value for d in x.shape[1:]])])
-    w = get_weight([x.shape[1].value, fmaps], **kwargs)
+        x = tf.reshape(x, [-1, np.prod([d for d in x.shape[1:]])])
+    w = get_weight([x.shape[1], fmaps], **kwargs)
     w = tf.cast(w, x.dtype)
     return tf.matmul(x, w)
 
@@ -163,7 +164,7 @@ def dense(x, fmaps, **kwargs):
 
 def conv2d(x, fmaps, kernel, **kwargs):
     assert kernel >= 1 and kernel % 2 == 1
-    w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
+    w = get_weight([kernel, kernel, x.shape[1], fmaps], **kwargs)
     w = tf.cast(w, x.dtype)
     return tf.nn.conv2d(x, w, strides=[1,1,1,1], padding='SAME', data_format='NCHW')
 
@@ -182,7 +183,7 @@ def upscale2d_conv2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
         return conv2d(upscale2d(x), fmaps, kernel, **kwargs)
 
     # Fused => perform both ops simultaneously using tf.nn.conv2d_transpose().
-    w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
+    w = get_weight([kernel, kernel, x.shape[1], fmaps], **kwargs)
     w = tf.transpose(w, [0, 1, 3, 2]) # [kernel, kernel, fmaps_out, fmaps_in]
     w = tf.pad(w, [[1,1], [1,1], [0,0], [0,0]], mode='CONSTANT')
     w = tf.add_n([w[1:, 1:], w[:-1, 1:], w[1:, :-1], w[:-1, :-1]])
@@ -201,7 +202,7 @@ def conv2d_downscale2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
         return downscale2d(conv2d(x, fmaps, kernel, **kwargs))
 
     # Fused => perform both ops simultaneously using tf.nn.conv2d().
-    w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
+    w = get_weight([kernel, kernel, x.shape[1], fmaps], **kwargs)
     w = tf.pad(w, [[1,1], [1,1], [0,0], [0,0]], mode='CONSTANT')
     w = tf.add_n([w[1:, 1:], w[:-1, 1:], w[1:, :-1], w[:-1, :-1]]) * 0.25
     w = tf.cast(w, x.dtype)
@@ -274,7 +275,7 @@ def apply_noise(x, noise_var=None, randomize_noise=True):
             noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
         else:
             noise = tf.cast(noise_var, x.dtype)
-        weight = tf.get_variable('weight', shape=[x.shape[1].value], initializer=tf.initializers.zeros())
+        weight = tf.get_variable('weight', shape=[x.shape[1]], initializer=tf.initializers.zeros())
         return x + noise * tf.reshape(tf.cast(weight, x.dtype), [1, -1, 1, 1])
 
 #----------------------------------------------------------------------------
@@ -332,7 +333,7 @@ def G_style(
     # Setup components.
     if 'synthesis' not in components:
         components.synthesis = tflib.Network('G_synthesis', func_name=G_synthesis, **kwargs)
-    num_layers = components.synthesis.input_shape[1]
+    num_layers = int(components.synthesis.input_shape[1])
     dlatent_size = components.synthesis.input_shape[2]
     if 'mapping' not in components:
         components.mapping = tflib.Network('G_mapping', func_name=G_mapping, dlatent_broadcast=num_layers, **kwargs)
@@ -385,7 +386,7 @@ def G_mapping(
     latents_in,                             # First input: Latent vectors (Z) [minibatch, latent_size].
     labels_in,                              # Second input: Conditioning labels [minibatch, label_size].
     latent_size             = 128,          # Latent vector (Z) dimensionality.
-    label_size              = 10,            # Label dimensionality, 0 if no labels.
+    label_size              = 0,            # Label dimensionality, 0 if no labels.
     dlatent_size            = 128,          # Disentangled latent (W) dimensionality.
     dlatent_broadcast       = None,         # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
     mapping_layers          = 8,            # Number of mapping layers.

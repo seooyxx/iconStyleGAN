@@ -25,8 +25,11 @@ Notes:
 from collections import OrderedDict
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorboard import summary as summary_lib
 from tensorboard.plugins.custom_scalar import layout_pb2
+from tensorboard.plugins.custom_scalar.summary import pb as custom_scalar_pb
+
 
 from . import tfutil
 from .tfutil import TfExpression
@@ -58,11 +61,11 @@ def _create_var(name: str, value_expr: TfExpression) -> TfExpression:
         v = [size_expr, v, tf.square(v)]
     else:
         v = [size_expr, tf.reduce_sum(v), tf.reduce_sum(tf.square(v))]
-    v = tf.cond(tf.is_finite(v[1]), lambda: tf.stack(v), lambda: tf.zeros(3, dtype=_dtype))
+    v = tf.cond(tf.math.is_finite(v[1]), lambda: tf.stack(v), lambda: tf.zeros(3, dtype=_dtype))
 
     with tfutil.absolute_name_scope("Autosummary/" + name_id), tf.control_dependencies(None):
         var = tf.Variable(tf.zeros(3, dtype=_dtype), trainable=False)  # [sum(1), sum(x), sum(x**2)]
-    update_op = tf.cond(tf.is_variable_initialized(var), lambda: tf.assign_add(var, v), lambda: tf.assign(var, v))
+    update_op = tf.cond(tf.compat.v1.is_variable_initialized(var), lambda: tf.assign_add(var, v), lambda: tf.assign(var, v))
 
     if name in _vars:
         _vars[name].append(var)
@@ -164,7 +167,7 @@ def finalize_autosummaries() -> None:
             margin = layout_pb2.MarginChartContent(series=series)
             charts.append(layout_pb2.Chart(title=chart_name, margin=margin))
         categories.append(layout_pb2.Category(title=cat_name, chart=charts))
-    layout = summary_lib.custom_scalar_pb(layout_pb2.Layout(category=categories))
+    layout = custom_scalar_pb(layout_pb2.Layout(category=categories))
     return layout
 
 def save_summaries(file_writer, global_step=None):
