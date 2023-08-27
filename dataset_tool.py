@@ -21,6 +21,7 @@ import PIL.Image
 import dnnlib.tflib as tflib
 import pickle
 from training import dataset
+from tqdm import tqdm
 
 #----------------------------------------------------------------------------
 
@@ -72,10 +73,13 @@ class TFRecordExporter:
             assert self.shape[0] in [1, 3]
             assert self.shape[1] == self.shape[2]
             assert self.shape[1] == 2**self.resolution_log2
-            tfr_opt = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.NONE)
+            tfr_opt = tf.io.TFRecordOptions(tf.compat.v1.io.TFRecordCompressionType.NONE)
+
             for lod in range(self.resolution_log2 - 1):
                 tfr_file = self.tfr_prefix + '-r%02d.tfrecords' % (self.resolution_log2 - lod)
-                self.tfr_writers.append(tf.python_io.TFRecordWriter(tfr_file, tfr_opt))
+                
+                self.tfr_writers.append(tf.io.TFRecordWriter(tfr_file, tfr_opt))
+
         assert img.shape == self.shape
         for lod, tfr_writer in enumerate(self.tfr_writers):
             if lod:
@@ -292,12 +296,13 @@ def unpickle(file):
         dict = pickle.load(fo, encoding='bytes')
     return dict
 
+#python dataset_tool.py create_from_images dataset/triplet_conditions rawdata/logos/ 1
 
 def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
     print("ADD CONDITION ", add_condition)
     print('Loading images from "%s"' % image_dir)
 
-    all_data = unpickle('../data/mypickle.pickle')
+    all_data = unpickle('rawdata/tripletmining.pickle')
     image_filenames_temp = all_data["Filenames"]
     conditions_all = all_data["Labels"] #for others use Clusters
     assert len(conditions_all) == len(image_filenames_temp)
@@ -322,7 +327,7 @@ def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
 
     drop = []
     df_copy = df.copy()
-    for i in range(len(df["Filenames"])):
+    for i in tqdm(range(len(df["Filenames"]))):
         img = np.asarray(PIL.Image.open(image_dir + df["Filenames"].iloc[i]))
         if channels == 1:
             img = img[np.newaxis, :, :] # HW => CHW
@@ -330,10 +335,10 @@ def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
             try:
                 img = img.transpose([2, 0, 1]) # HWC => CHW
 
-                print("added")
+                #print("added")
             except:
                 drop.append(i)
-                print("deleted")
+                #print("deleted")
                 continue
 
     print("NUMBER OF IMAGES BEFORE: ", len(df))
@@ -344,22 +349,22 @@ def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
         order = np.arange(len(df))
         drop = []
         deleted = []
-        for idx in range(order.size):
-            print("HERE ",df["Filenames"].iloc[order[idx]])
+        for idx in tqdm(range(order.size)):
+            #print("HERE ",df["Filenames"].iloc[order[idx]])
             img = np.asarray(PIL.Image.open(image_dir + df["Filenames"].iloc[order[idx]]))
             if channels == 1:
                 img = img[np.newaxis, :, :] # HW => CHW
             else:
                 img = img.transpose([2, 0, 1]) # HWC => CHW
-                try:
-                    tfr.add_image(img)
-                except:
-                    #os.remove(image_filenames[order[idx]])
-                    print("DELETED")
-                    drop.append(df.index[order[idx]])
-                    print("###########")
-                    deleted.append(df["Filenames"].iloc[order[idx]])
-                    continue
+            try:
+                tfr.add_image(img)
+            except:
+                #os.remove(image_filenames[order[idx]])
+                print("DELETED")
+                drop.append(df.index[order[idx]])
+                print("###########")
+                deleted.append(df["Filenames"].iloc[order[idx]])
+                continue
 
 
         print("############# DELETED FILENAMES ############")

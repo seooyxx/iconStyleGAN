@@ -77,7 +77,7 @@ def main():
 
     # Which networks to evaluate them on?
     tasks = []
-    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl='./results/00010-sgan-logos-1gpu-cond/network-snapshot-020400.pkl', dataset_args=EasyDict(tfrecord_dir='resnet_conditions', shuffle_mb=0), mirror_augment=True)]
+    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl='./results/00036-sgan-logos-1gpu-cond/network-snapshot-009002.pkl', dataset_args=EasyDict(tfrecord_dir='logos', shuffle_mb=0), mirror_augment=True)]
 
     # How many GPUs to use?
     submit_config.num_gpus = 1
