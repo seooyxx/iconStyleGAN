@@ -40,7 +40,7 @@ class TFRecordDataset:
     def __init__(self,
         tfrecord_dir,               # Directory containing a collection of tfrecords files.
         resolution      = None,     # Dataset resolution, None = autodetect.
-        label_file      = None,     # Relative path of the labels file, None = autodetect.
+        label_file      = 'tripletmining-rxx.labels',     # Relative path of the labels file, None = autodetect.
         max_label_size  = 'full',        # 0 = no labels, 'full' = full labels, <int> = N first label components.
         repeat          = True,     # Repeat dataset indefinitely.
         shuffle_mb      = 4096,     # Shuffle data within specified window (megabytes), 0 = disable shuffling.
@@ -48,7 +48,7 @@ class TFRecordDataset:
         buffer_mb       = 256,      # Read buffer size (megabytes).
         num_threads     = 2):       # Number of concurrent threads.
 
-        self.tfrecord_dir       = 'dataset/logos'
+        self.tfrecord_dir       = 'dataset/tripletmining'
         self.resolution         = None
         self.resolution_log2    = None
         self.shape              = []        # [channel, height, width]

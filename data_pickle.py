@@ -12,10 +12,10 @@ def dir_to_pickle():
         pickle.dump(mypickle, f)
 
 def open_pickle():
-    with open('rawdata/mypickle.pickle', "rb") as f:
+    with open('rawdata/tripletmining.pickle', "rb") as f:
         data = pickle.load(f)
     return data
 
-dir_to_pickle()
+#dir_to_pickle()
 data = open_pickle()
 print(data["Labels"][:3])

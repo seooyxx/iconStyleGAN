@@ -23,22 +23,24 @@ import config
 #----------------------------------------------------------------------------
 
 # RESNET MODEL:
-model_place = 'https://drive.google.com/uc?export=download&id=19Vg7WgVz5bDlSes9WI-6wooCuyk07Dch'
-
+# model_place = 'https://drive.google.com/uc?export=download&id=19Vg7WgVz5bDlSes9WI-6wooCuyk07Dch'
+#model_place = "results/network-snapshot-020400.pkl"
 # Word Based model:
 #model_place = 'https://drive.google.com/uc?export=download&id=1DNFIfYITDOUKePJ_KRaVe6zEIcTfyOss'
 
 # Unconditional Model:
 #model_place = 'https://drive.google.com/uc?export=download&id=1ze6rO7cjZFOcJg2KvPByyYlQmtpgEpLW'
 
+# Own Model (Triplet Clustering) :
+model_place = "results/00044-sgan-triplet-1gpu-cond/network-snapshot-004622.pkl"
 synthesis_kwargs = dict(output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True), minibatch_size=8)
 
 _Gs_cache = dict()
 
 def load_Gs(url):
     if url not in _Gs_cache:
-        with dnnlib.util.open_url(url, cache_dir=config.cache_dir) as f:
-    #with open(url, "wb") as f:
+        #with dnnlib.util.open_url(url, cache_dir=config.cache_dir) as f:
+        with open(url, "rb") as f:
             _G, _D, Gs = pickle.load(f)
         _Gs_cache[url] = Gs
     return _Gs_cache[url]
@@ -119,8 +121,9 @@ def draw_truncation_trick_figure(png, Gs, w, h, seeds, psis, labels_exist):
     latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in seeds)
 
     if labels_exist == True:
-        a = np.random.randint(0,10, len(seeds))
-        labels = np.zeros((a.shape[0], a.max()+1))
+        a = np.random.randint(0,64, len(seeds))
+        #labels = np.zeros((a.shape[0], a.max()+1))
+        labels = np.zeros((a.shape[0], 64))
         labels[np.arange(len(a)), a] = 1
         dlatents = Gs.components.mapping.run(latents, labels) # [seed, layer, component]
     else:
@@ -136,6 +139,28 @@ def draw_truncation_trick_figure(png, Gs, w, h, seeds, psis, labels_exist):
     canvas.save(png)
 
 #----------------------------------------------------------------------------
+# No One-hot Encoding Label
+
+def draw_truncation_trick_figure_ver2(png, Gs, w, h, seeds, psis, labels_exist):
+    print(png)
+    latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in seeds)  # 수정된 부분
+    print(latents.shape)
+    if labels_exist == True:
+        labels = np.random.randint(0,64, len(seeds))  # 레이블의 번호를 그대로 사용
+        print(labels)
+        dlatents = Gs.components.mapping.run(latents, labels[:, np.newaxis]) # [seed, layer, component]
+    else:
+        dlatents = Gs.components.mapping.run(latents, None) # [seed, layer, component]
+    dlatent_avg = Gs.get_var('dlatent_avg') # [component]
+
+    canvas = PIL.Image.new('RGB', (w * len(psis), h * len(seeds)), 'white')
+    for row, dlatent in enumerate(list(dlatents)):
+        row_dlatents = (dlatent[np.newaxis] - dlatent_avg) * np.reshape(psis, [-1, 1, 1]) + dlatent_avg
+        row_images = Gs.components.synthesis.run(row_dlatents, randomize_noise=False, **synthesis_kwargs)
+        for col, image in enumerate(list(row_images)):
+            canvas.paste(PIL.Image.fromarray(image, 'RGB'), (col * w, row * h))
+    canvas.save(png)
+#----------------------------------------------------------------------------
 # Main program.
 
 def main():
@@ -144,7 +169,10 @@ def main():
     #draw_uncurated_result_figure(os.path.join(config.result_dir, 'uncurated_results.png'), load_Gs(model_place), cx=0, cy=0, cw=128, ch=128, rows=5, lods=[0,0,1,1,2,2,2], seed=np.random.randint(0,100000))
     #draw_noise_detail_figure(os.path.join(config.result_dir, 'noise-detail.png'), load_Gs(model_place), w=128, h=128, num_samples=100, seeds=[np.random.randint(0,100000),np.random.randint(0,100000), np.random.randint(0,100000),np.random.randint(0,100000)])
     #draw_noise_components_figure(os.path.join(config.result_dir, 'noise-components.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000), np.random.randint(0,100000)], noise_ranges=[range(0, 18), range(0, 0), range(8, 18), range(0, 8)], flips=[1])
-    draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000),np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,12345), np.random.randint(0,12345),np.random.randint(0,12345)], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
+    #draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000),np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,12345), np.random.randint(0,12345),np.random.randint(0,12345)], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
+    draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000)], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
+    #draw_truncation_trick_figure_ver2(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[4, 6,34], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
+
     #draw_uncurated_result_figure(os.path.join(config.result_dir, 'figure10-uncurated-bedrooms.png'), load_Gs(url_bedrooms), cx=0, cy=0, cw=256, ch=256, rows=5, lods=[0,0,1,1,2,2,2], seed=0)
     #draw_uncurated_result_figure(os.path.join(config.result_dir, 'figure11-uncurated-cars.png'), load_Gs(url_cars), cx=0, cy=64, cw=512, ch=384, rows=4, lods=[0,1,2,2,3,3], seed=2)
     #draw_uncurated_result_figure(os.path.join(config.result_dir, 'figure12-uncurated-cats.png'), load_Gs(url_cats), cx=0, cy=0, cw=256, ch=256, rows=5, lods=[0,0,1,1,2,2,2], seed=1)
