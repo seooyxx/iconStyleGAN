@@ -32,7 +32,7 @@ import config
 #model_place = 'https://drive.google.com/uc?export=download&id=1ze6rO7cjZFOcJg2KvPByyYlQmtpgEpLW'
 
 # Own Model (Triplet Clustering) :
-model_place = "results/00044-sgan-triplet-1gpu-cond/network-snapshot-004622.pkl"
+model_place = "results/00047-sgan-triplet-1gpu-cond/network-snapshot-020000.pkl"
 synthesis_kwargs = dict(output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True), minibatch_size=8)
 
 _Gs_cache = dict()
@@ -50,10 +50,12 @@ def load_Gs(url):
 
 def draw_uncurated_result_figure(png, Gs, cx, cy, cw, ch, rows, lods, seed):
     print(png)
+    
     latents = np.random.RandomState(seed).randn(sum(rows * 2**lod for lod in lods), Gs.input_shape[1])
-    a = np.random.randint(0,10, sum(rows * 2**lod for lod in lods))
-    labels = np.zeros((a.shape[0], a.max()+1))
+    a = np.random.randint(0,64, sum(rows * 2**lod for lod in lods))
+    labels = np.zeros((a.shape[0], 64))
     labels[np.arange(len(a)), a] = 1
+
 
     images = Gs.run(latents, labels, **synthesis_kwargs) # [seed, y, x, rgb]
     #images = Gs.run(latents, None, **synthesis_kwargs) # [seed, y, x, rgb]
@@ -64,7 +66,7 @@ def draw_uncurated_result_figure(png, Gs, cx, cy, cw, ch, rows, lods, seed):
         for row in range(rows * 2**lod):
             image = PIL.Image.fromarray(next(image_iter), 'RGB')
             image = image.crop((cx, cy, cx + cw, cy + ch))
-            image = image.resize((cw // 2**lod, ch // 2**lod), PIL.Image.ANTIALIAS)
+            image = image.resize((cw // 2**lod, ch // 2**lod), PIL.Image.Resampling.LANCZOS)
             canvas.paste(image, (sum(cw // 2**lod for lod in lods[:col]), row * ch // 2**lod))
     canvas.save(png)
 
@@ -166,11 +168,19 @@ def draw_truncation_trick_figure_ver2(png, Gs, w, h, seeds, psis, labels_exist):
 def main():
     tflib.init_tf()
     os.makedirs(config.result_dir, exist_ok=True)
-    #draw_uncurated_result_figure(os.path.join(config.result_dir, 'uncurated_results.png'), load_Gs(model_place), cx=0, cy=0, cw=128, ch=128, rows=5, lods=[0,0,1,1,2,2,2], seed=np.random.randint(0,100000))
+    draw_uncurated_result_figure(os.path.join(config.result_dir, 'uncurated_results.png'), 
+                                 load_Gs(model_place), 
+                                 cx=0, cy=0, cw=128, ch=128, rows=5, 
+                                 lods=[0,0,1,1,2,2,2], seed=np.random.randint(0,100000))
     #draw_noise_detail_figure(os.path.join(config.result_dir, 'noise-detail.png'), load_Gs(model_place), w=128, h=128, num_samples=100, seeds=[np.random.randint(0,100000),np.random.randint(0,100000), np.random.randint(0,100000),np.random.randint(0,100000)])
     #draw_noise_components_figure(os.path.join(config.result_dir, 'noise-components.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000), np.random.randint(0,100000)], noise_ranges=[range(0, 18), range(0, 0), range(8, 18), range(0, 8)], flips=[1])
     #draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000),np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,100000), np.random.randint(0,12345), np.random.randint(0,12345),np.random.randint(0,12345)], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
-    draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[np.random.randint(0,100000)], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
+    # draw_truncation_trick_figure(os.path.join(config.result_dir, 'truncation-trick.png'), 
+    #                              load_Gs(model_place), 
+    #                              w=128, h=128, 
+    #                              seeds=[np.random.randint(0,100000)], 
+    #                              psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], 
+    #                              labels_exist = True)
     #draw_truncation_trick_figure_ver2(os.path.join(config.result_dir, 'truncation-trick.png'), load_Gs(model_place), w=128, h=128, seeds=[4, 6,34], psis=[1,0.9, 0.7, 0.5, 0, -0.5, -1], labels_exist = True)
 
     #draw_uncurated_result_figure(os.path.join(config.result_dir, 'figure10-uncurated-bedrooms.png'), load_Gs(url_bedrooms), cx=0, cy=0, cw=256, ch=256, rows=5, lods=[0,0,1,1,2,2,2], seed=0)
